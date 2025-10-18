@@ -149,11 +149,20 @@
       <div class="relative mx-auto p-6 border w-full max-w-sm shadow-2xl rounded-2xl bg-white text-center">
         <h3 class="text-xl leading-6 font-bold text-gray-900" id="modalTitle">Scan to Pay</h3>
         <div class="mt-4 px-2 py-3">
+          <!-- Desktop QR Code View -->
           <div id="qrcode-container">
             <div id="qrcode" class="mx-auto w-52 h-52 mb-4 p-2 border rounded-lg"></div>
             <p class="text-sm text-gray-600 mt-2">
               Scan with your banking app to pay <strong id="modalAmount" class="text-blue-600 font-bold"></strong> KHR.
             </p>
+          </div>
+          <!-- NEW: Mobile Deep Link View -->
+          <div id="mobile-link-container" class="hidden">
+            <p class="text-lg font-medium text-gray-700">Ready to Pay?</p>
+            <p class="text-sm text-gray-500 mt-2 mb-4">If your banking app doesn't open automatically, please tap the button below.</p>
+            <a id="manual-deeplink-btn" href="#" class="inline-block w-full px-4 py-3 text-white text-base font-bold rounded-xl shadow-lg">
+                Open App Manually
+            </a>
           </div>
            <p id="modalMessage" class="mt-4 text-base font-semibold text-gray-800 h-6"></p>
         </div>
@@ -174,7 +183,7 @@
     
     // === IMPORTANT: ENTER YOUR BANK DETAILS HERE ===
     const MERCHANT_INFO = {
-        name: "LORN DAVIT", // Your name as it appears in the bank app
+        name: "YOUR FULL NAME", // Your name as it appears in the bank app
         city: "Phnom Penh",      // Your city
         aba: {
             account: "000123456" // Your ABA Bank Account Number
@@ -188,7 +197,7 @@
     const searchContainer = document.getElementById('searchContainer');
     const searchBtn = document.getElementById('searchBtn');
     const studentNameInput = document.getElementById('studentName');
-    const autocompleteDropdown = document.getElementById('autocompleteDropdown'); // New dropdown
+    const autocompleteDropdown = document.getElementById('autocompleteDropdown'); 
     const messageDiv = document.getElementById('message');
     const paymentSection = document.getElementById('paymentSection');
     const roomDisplay = document.getElementById('roomDisplay');
@@ -197,8 +206,9 @@
     
     // Modal elements
     const qrModal = document.getElementById('qrModal');
-    const qrCodeContainer = document.getElementById('qrcode');
     const qrCodeDisplayContainer = document.getElementById('qrcode-container');
+    const mobileLinkContainer = document.getElementById('mobile-link-container');
+    const manualDeeplinkBtn = document.getElementById('manual-deeplink-btn');
     const cancelPaymentBtn = document.getElementById('cancelPaymentBtn');
     const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
     const modalTitle = document.getElementById('modalTitle');
@@ -209,7 +219,7 @@
     let currentStudent = null;
     let qrCodeInstance = null;
     let pendingPaymentData = null; 
-    let allStudentNames = []; // To store all names for filtering
+    let allStudentNames = []; 
 
     function isMobileDevice() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -226,13 +236,11 @@
         .then(res => res.json())
         .then(response => {
             if (response.status === 'success' && Array.isArray(response.data)) {
-                allStudentNames = response.data; // Store names
+                allStudentNames = response.data; 
             } else { console.error("Failed to load student names:", response.message); }
         })
         .catch(error => { console.error("Error fetching student names:", error); });
     });
-
-    // --- NEW DROPDOWN LOGIC ---
     
     function updateDropdown(filter = '') {
         autocompleteDropdown.innerHTML = '';
@@ -247,7 +255,7 @@
             const item = document.createElement('div');
             item.className = 'p-3 hover:bg-gray-700 cursor-pointer';
             item.textContent = name;
-            item.addEventListener('mousedown', (e) => { // Use mousedown to fire before blur
+            item.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 studentNameInput.value = name;
                 autocompleteDropdown.classList.add('hidden');
@@ -261,14 +269,11 @@
     studentNameInput.addEventListener('input', () => updateDropdown(studentNameInput.value));
     studentNameInput.addEventListener('focus', () => updateDropdown(studentNameInput.value));
     
-    // Hide dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!searchContainer.contains(e.target)) {
             autocompleteDropdown.classList.add('hidden');
         }
     });
-
-    // --- END NEW DROPDOWN LOGIC ---
 
     // Event listeners
     searchBtn.addEventListener('click', findStudent);
@@ -282,7 +287,8 @@
     confirmPaymentBtn.addEventListener('click', logTransaction);
 
     function findStudent() {
-        autocompleteDropdown.classList.add('hidden'); // Hide dropdown on search
+        studentNameInput.blur(); // <-- THIS IS THE NEW LINE TO HIDE THE KEYBOARD
+        autocompleteDropdown.classList.add('hidden'); 
         const studentName = studentNameInput.value.trim();
         if (!studentName) return showMessage('Please enter a student name.', 'red');
         setLoading(true);
@@ -339,17 +345,27 @@
 
         if (isMobileDevice()) {
             qrCodeDisplayContainer.classList.add('hidden'); 
-            modalMessage.textContent = 'After paying in your bank app, return here and tap "I Have Paid".';
+            mobileLinkContainer.classList.remove('hidden');
+            modalMessage.textContent = 'After paying, return here and tap "I Have Paid".';
             
             let deepLinkUrl;
             if (bankName === 'ABA') {
                 deepLinkUrl = `abamobile://pay?account_number=${MERCHANT_INFO.aba.account}&amount=${pendingPaymentData.amount}&currency=KHR`;
+                manualDeeplinkBtn.textContent = 'Open ABA App';
+                manualDeeplinkBtn.className = 'inline-block w-full px-4 py-3 text-white text-base font-bold rounded-xl shadow-lg bg-red-600 hover:bg-red-700';
             } else if (bankName === 'ACLEDA') {
                 deepLinkUrl = `acledatouch://`;
+                manualDeeplinkBtn.textContent = 'Open ACLEDA App';
+                manualDeeplinkBtn.className = 'inline-block w-full px-4 py-3 text-white text-base font-bold rounded-xl shadow-lg bg-blue-800 hover:bg-blue-900';
             }
-            if (deepLinkUrl) window.location.href = deepLinkUrl;
+            
+            if (deepLinkUrl) {
+                manualDeeplinkBtn.href = deepLinkUrl; 
+                window.location.href = deepLinkUrl;
+            }
 
         } else {
+            mobileLinkContainer.classList.add('hidden');
             qrCodeDisplayContainer.classList.remove('hidden'); 
             modalMessage.textContent = 'Please scan the QR code, then click "I Have Paid" to confirm.';
             generateKHQR(bankName, parseFloat(amount));
@@ -460,5 +476,4 @@
 </script>
 </body>
 </html>
-
 
